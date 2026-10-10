@@ -1,0 +1,20 @@
+const express = require("express");
+const router = express.Router();
+const a = require("../controllers/admin.controller");
+const { protect } = require("../middleware/auth.middleware");
+const { restrictTo } = require("../middleware/role.middleware");
+
+router.use(protect, restrictTo("admin"));
+router.get("/stats", a.getStats);
+router.get("/users", a.listUsers);
+router.patch("/users/:id", a.updateUser);
+router.post("/instructors", a.createInstructor);
+router.get("/courses", a.listCourses);
+router.get("/batches", a.listBatches);
+router.patch("/batches/:id", a.updateBatch);
+router.get("/settings", a.getSettings);
+router.put("/settings", a.updateSettings);
+router.get("/promos", a.listPromos);
+router.post("/promos", a.createPromo);
+router.patch("/promos/:id/toggle", a.togglePromo);
+module.exports = router;
