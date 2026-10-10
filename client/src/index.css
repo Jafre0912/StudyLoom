@@ -8,3 +8,12 @@ body { @apply bg-slate-50 text-slate-900 antialiased font-sans; }
   .input { @apply w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-100; }
   .label { @apply mb-1.5 block text-sm font-medium text-slate-700; }
 }
+@layer utilities {
+  .animate-fadeUp {
+    animation: fadeUp 0.2s ease-out forwards;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
