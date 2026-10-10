@@ -15,19 +15,29 @@ export default function HomePage() {
   const cats = useCategories();
   return (
     <>
-      <section className="relative overflow-hidden bg-gradient-to-b from-brand-50 via-white to-white">
-        <div className="pointer-events-none absolute -right-40 -top-40 h-[28rem] w-[28rem] rounded-full bg-brand-200/40 blur-3xl" />
-        <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:py-24">
-          <div className="animate-fadeUp">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-brand-700 shadow-sm ring-1 ring-brand-100"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-500" />100% live, instructor-led classes</span>
-            <h1 className="mt-5 text-4xl font-extrabold leading-[1.1] tracking-tight sm:text-5xl lg:text-6xl">Learn Skills. Live Classes. <span className="text-brand-600">Build Your Career.</span></h1>
-            <p className="mt-5 max-w-xl text-lg text-slate-600">Join real instructors in real time. Pick a batch that fits your day, attend live, get tracked automatically, and earn a certificate anyone can verify.</p>
-            <div className="mt-8 flex flex-wrap gap-3"><Button as={Link} to="/courses" size="lg">Explore Courses <ArrowRight size={18} /></Button><Button as={Link} to="/live-classes" size="lg" variant="secondary">See Live Classes</Button></div>
-            <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">{TRUST.map(([I, t]) => <div key={t} className="flex items-center gap-2 text-sm font-medium text-slate-700"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-brand-600 shadow-sm ring-1 ring-slate-200"><I size={17} /></span>{t}</div>)}</div>
+<section className="relative overflow-hidden bg-gradient-to-b from-brand-50 via-white to-white">
+  <div className="pointer-events-none absolute -right-40 -top-40 h-[28rem] w-[28rem] rounded-full bg-brand-200/40 blur-3xl" />
+  <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-4 py-10 sm:px-6 sm:py-14 lg:grid-cols-2 lg:gap-12 lg:py-24">
+    <div className="min-w-0 animate-fadeUp">
+      <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-brand-700 shadow-sm ring-1 ring-brand-100"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-500" />100% live, instructor-led classes</span>
+      <h1 className="mt-4 text-3xl font-extrabold leading-[1.15] tracking-tight sm:mt-5 sm:text-5xl lg:text-6xl">Learn Skills. Live Classes. <span className="text-brand-600">Build Your Career.</span></h1>
+      <p className="mt-4 max-w-xl text-base text-slate-600 sm:text-lg">Join real instructors in real time. Pick a batch that fits your day, attend live, get tracked automatically, and earn a certificate anyone can verify.</p>
+      <div className="mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row">
+        <Button as={Link} to="/courses" size="lg" className="w-full sm:w-auto">Explore Courses <ArrowRight size={18} /></Button>
+        <Button as={Link} to="/live-classes" size="lg" variant="secondary" className="w-full sm:w-auto">See Live Classes</Button>
+      </div>
+      <div className="mt-8 grid grid-cols-2 gap-x-3 gap-y-4 sm:mt-10 sm:grid-cols-4">
+        {TRUST.map(([I, t]) => (
+          <div key={t} className="flex min-w-0 items-center gap-2 text-xs font-medium text-slate-700 sm:text-sm">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-brand-600 shadow-sm ring-1 ring-slate-200"><I size={17} /></span>
+            <span className="leading-tight">{t}</span>
           </div>
-          <div className="animate-fadeUp lg:pl-6"><LiveClassPreview /></div>
-        </div>
-      </section>
+        ))}
+      </div>
+    </div>
+    <div className="min-w-0 animate-fadeUp lg:pl-6"><LiveClassPreview /></div>
+  </div>
+</section>
 
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
         <div className="mb-8 flex items-end justify-between"><div><h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Explore by category</h2><p className="mt-1 text-slate-500">Seven tracks, one live learning experience.</p></div><Link to="/courses" className="hidden text-sm font-semibold text-brand-600 sm:block">View all →</Link></div>

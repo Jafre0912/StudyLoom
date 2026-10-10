@@ -55,7 +55,7 @@ export default function CourseDetailPage() {
         </div>
       </section>
 
-      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_22rem]">
+      <div className="mx-auto grid max-w-7xl pb-24 lg:pb-10 gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_22rem]">
         <div className="space-y-10 lg:order-1">
           <section><h2 className="mb-4 text-xl font-bold">What you will get</h2><div className="grid gap-3 sm:grid-cols-2">{c.outcomes.map((o) => <div key={o} className="flex gap-2.5 text-sm text-slate-700"><CheckCircle2 size={18} className="mt-0.5 shrink-0 text-emerald-600" />{o}</div>)}</div></section>
           <section><h2 className="mb-4 text-xl font-bold">Live curriculum <span className="text-sm font-normal text-slate-500">· {c.modules.length} modules · {c.totalClasses} live classes</span></h2><Accordion items={c.modules} /></section>
@@ -73,8 +73,8 @@ export default function CourseDetailPage() {
           <section><h2 className="mb-4 text-xl font-bold">Frequently asked questions</h2><Accordion items={c.faqs} /></section>
         </div>
 
-        <aside className="lg:order-2 lg:-mt-72">
-          <div className="card sticky top-24 overflow-hidden shadow-xl">
+        <aside className="order-first lg:order-2 lg:-mt-72">
+          <div className="card overflow-hidden shadow-xl lg:sticky lg:top-24">
             <img src={c.thumbnail} alt="" className="aspect-video w-full object-cover" />
             <div className="p-5">
               <div className="flex items-baseline gap-2"><span className="text-3xl font-extrabold">{c.price > 0 ? money(c.price) : "Free"}</span>{discount > 0 && <><span className="text-sm text-slate-400 line-through">{money(c.oldPrice)}</span><Badge tone="green">{discount}% off</Badge></>}</div>
@@ -88,6 +88,12 @@ export default function CourseDetailPage() {
           </div>
         </aside>
       </div>
+      {!enrolled && (
+  <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3 shadow-[0_-4px_16px_rgba(0,0,0,.06)] lg:hidden">
+    <div><p className="text-lg font-extrabold leading-none">{c.price > 0 ? money(c.price) : "Free"}</p>{discount > 0 && <p className="text-xs text-slate-400 line-through">{money(c.oldPrice)}</p>}</div>
+    <Button onClick={enroll} className="flex-1 sm:flex-none">{pending ? "Choose batch" : c.price > 0 ? "Enroll Now" : "Enroll for Free"}</Button>
+  </div>
+)}
     </>
   );
 }

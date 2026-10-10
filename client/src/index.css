@@ -17,3 +17,9 @@ body { @apply bg-slate-50 text-slate-900 antialiased font-sans; }
     to { opacity: 1; transform: translateY(0); }
   }
 }
+
+
+@layer components {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+}
+html, body { max-width: 100%; overflow-x: clip; }
