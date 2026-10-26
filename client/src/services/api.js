@@ -68,3 +68,9 @@ export const fetchInstructors = () => http.get("/admin/users?role=instructor").t
 export const fetchPendingCash = () => http.get("/billing/admin/cash-pending").then((r) => r.items);
 export const confirmCash = (paymentId) => http.post(`/billing/admin/payments/${paymentId}/confirm`);
 export const rejectCash = (paymentId) => http.post(`/billing/admin/payments/${paymentId}/reject`);
+
+
+export const fetchAdminCategories = () => http.get("/categories/admin/all").then((r) => r.items);
+export const createCategory = (body) => http.post("/categories", body);
+export const updateCategory = (cid, body) => http.patch(`/categories/${cid}`, body);
+export const deleteCategory = (cid) => http.delete(`/categories/${cid}`);

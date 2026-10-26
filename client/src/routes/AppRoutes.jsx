@@ -27,6 +27,7 @@ import AdminBatches from "../pages/admin/AdminBatches.jsx";
 import AdminPromos from "../pages/admin/AdminPromos.jsx";
 import AdminSettings from "../pages/admin/AdminSettings.jsx";
 import AdminCashPayments from "../pages/admin/AdminCashPayments.jsx";
+import AdminCategories from "../pages/admin/AdminCategories.jsx";
 
 export default function AppRoutes() {
   return (
@@ -69,6 +70,7 @@ export default function AppRoutes() {
           <Route path="courses" element={<AdminCourses />} />
           <Route path="batches" element={<AdminBatches />} />
           <Route path="promos" element={<AdminPromos />} />
+          <Route path="categories" element={<AdminCategories />} />
           <Route path="settings" element={<AdminSettings />} />
           <Route path="cash-payments" element={<AdminCashPayments />} />
         </Route>

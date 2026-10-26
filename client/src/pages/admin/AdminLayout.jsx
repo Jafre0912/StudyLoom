@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, BookOpen, CalendarClock, Tag, Banknote, Settings } from "lucide-react";
+import { LayoutDashboard, Users, BookOpen, CalendarClock, Tag, Banknote, Settings, Layers } from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout.jsx";
 
 const ITEMS = [
@@ -9,6 +9,7 @@ const ITEMS = [
   ["/admin/promos", "Promo codes", Tag],
   ["/admin/cash-payments", "Cash payments", Banknote],
   ["/admin/settings", "Settings", Settings],
+  ["/admin/categories", "Categories", Layers],
 ];
 
 export default function AdminLayout() {

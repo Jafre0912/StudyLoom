@@ -10,7 +10,14 @@ import { money, fmtDate } from "../utils/format.js";
 
 export const AdminLayout = () => <DashboardLayout subtitle="Admin" items={[["/admin", "Management", LayoutDashboard, true]]} />;
 
-const Table = ({ heads, children }) => <div className="card overflow-x-auto"><table className="w-full min-w-[640px] text-left text-sm"><thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500"><tr>{heads.map((h) => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{children}</tbody></table></div>;
+const Table = ({ heads, children }) => <div className="card overflow-x-auto">
+  <table className="w-full min-w-[640px] text-left text-sm">
+    <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
+      <tr>{heads.map((h) => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}</tr>
+      </thead>
+  <tbody className="divide-y divide-slate-100">{children}</tbody>
+  </table>
+  </div>;
 const Panel = ({ q, empty, children }) => q.isLoading ? <Skeleton className="h-48" /> : q.error ? <ErrorState error={q.error} onRetry={q.refetch} /> : !q.data?.length && empty ? <EmptyState title={empty} /> : children(q.data);
 
 function CourseForm({ course, onClose, onSaved }) {
