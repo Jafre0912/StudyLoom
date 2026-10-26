@@ -14,7 +14,13 @@ export function LiveClassesPublicPage() {
         {isLoading ? <RowSkeletons /> : error ? <ErrorState error={error} onRetry={refetch} /> : up.length === 0 ? <EmptyState icon={Radio} title="No classes scheduled" text="Check back soon." /> : up.map((s) => (
           <div key={s.id} className="card flex flex-wrap items-center gap-4 p-4">
             <img src={s.course?.thumbnail} alt="" className="h-16 w-28 rounded-lg object-cover" />
-            <div className="min-w-[10rem] flex-1"><div className="flex items-center gap-2">{s.status === "live" ? <Badge tone="rose"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-500" />Live now</Badge> : <Badge tone="brand">{fmtDay(s.startsAt)} · {fmtTime(s.startsAt)}</Badge>}</div><p className="mt-1 font-semibold">{s.title}</p><p className="text-sm text-slate-500">{s.course?.title} · {s.instructor}</p></div>
+            <div className="min-w-[10rem] flex-1">
+              <div className="flex items-center gap-2">{s.status === "live" ? <Badge tone="rose">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-500" />Live now</Badge> : <Badge tone="brand">{fmtDay(s.startsAt)} · {fmtTime(s.startsAt)}</Badge>}
+                </div>
+                <p className="mt-1 font-semibold">{s.title.replace(/\s·\s(Class|Lesson)\s\d+$/, "")}</p>
+                 <p className="text-sm text-slate-500">{s.course?.title} · {s.instructor}</p>
+                 </div>
             <Button as={Link} to={`/courses/${s.course?.slug}`} variant="secondary" size="sm">View course</Button>
           </div>
         ))}

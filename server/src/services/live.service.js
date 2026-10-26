@@ -155,4 +155,23 @@ async function batchesForCourse(courseId) {
   return Promise.all(batches.map(async (b) => ({ _id: b._id, id: b.key, key: b.key, label: batchLabel(b), time: batchTime(b), days: b.days, startDate: b.startDate, capacity: b.capacity, isOpen: b.isOpen, ...(await seatInfo(b)) })));
 }
 
-module.exports = { ensureBatches, batchesForCourse, generateSessions, seatInfo, batchLabel, batchTime, attendanceStatus, credit, liveCount, liveCounts, enrollmentStats, issueCertificatesForBatch, oid };
+
+// After a batch's time changes, move its upcoming classes to the new time.
+async function rescheduleSessions(batch) {
+  const [bh, bm] = batch.startTime.split(":").map(Number);
+  const [eh, em] = batch.endTime.split(":").map(Number);
+  const durationMin = eh * 60 + em - (bh * 60 + bm);
+  const sessions = await Session.find({ batchId: batch._id, status: "scheduled", startsAt: { $gt: new Date() } });
+  if (!sessions.length) return 0;
+  await Session.bulkWrite(sessions.map((s) => {
+    const local = new Date(s.startsAt.getTime() + NEPAL_OFFSET_MIN * 60000);
+    return {
+      updateOne: {
+        filter: { _id: s._id },
+        update: { startsAt: nepalDate(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), batch.startTime), durationMin },
+      },
+    };
+  }));
+  return sessions.length;
+}
+module.exports = { ensureBatches, batchesForCourse, generateSessions, seatInfo, batchLabel, batchTime, attendanceStatus, credit, liveCount, liveCounts, enrollmentStats, issueCertificatesForBatch, oid, rescheduleSessions };

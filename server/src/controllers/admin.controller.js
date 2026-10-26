@@ -14,6 +14,7 @@ const live = require("../services/live.service");
 const { present, POPULATE } = require("./course.controller");
 
 const escapeRegex = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/; // "HH:MM", 24h
 
 // GET /api/admin/stats
 const getStats = asyncHandler(async (req, res) => {
@@ -69,18 +70,46 @@ const listCourses = asyncHandler(async (req, res) => {
   sendResponse(res, 200, "Courses fetched", { items: courses.map((c) => present(c, { learners: m.get(String(c._id)) || 0 })) });
 });
 
-// GET /api/admin/batches
 const listBatches = asyncHandler(async (req, res) => {
   const batches = await Batch.find().populate("courseId", "title slug").sort({ startDate: 1 }).limit(300);
-  const items = await Promise.all(batches.map(async (b) => ({ _id: b._id, course: b.courseId, label: live.batchLabel(b), time: live.batchTime(b), days: b.days, startDate: b.startDate, capacity: b.capacity, isOpen: b.isOpen, ...(await live.seatInfo(b)) })));
+  const items = await Promise.all(batches.map(async (b) => ({
+    _id: b._id,
+    course: b.courseId,
+    key: b.key,
+    startTime: b.startTime,
+    endTime: b.endTime,
+    label: live.batchLabel(b),
+    time: live.batchTime(b),
+    days: b.days,
+    startDate: b.startDate,
+    capacity: b.capacity,
+    isOpen: b.isOpen,
+    ...(await live.seatInfo(b)),
+  })));
   sendResponse(res, 200, "Batches fetched", { items });
 });
-// PATCH /api/admin/batches/:id  { capacity?, isOpen? }
+// PATCH /api/admin/batches/:id  { capacity?, isOpen?, startTime?, endTime? }
 const updateBatch = asyncHandler(async (req, res) => {
   const b = await Batch.findById(req.params.id);
+  const timeChanged = req.body.startTime !== undefined || req.body.endTime !== undefined;
+  await b.save();
+if (timeChanged) await live.rescheduleSessions(b);
   if (!b) throw new ApiError(404, "Batch not found");
   if (Number.isInteger(req.body.capacity) && req.body.capacity > 0) b.capacity = req.body.capacity;
   if (typeof req.body.isOpen === "boolean") b.isOpen = req.body.isOpen;
+
+  if (req.body.startTime !== undefined || req.body.endTime !== undefined) {
+    const s = req.body.startTime ?? b.startTime;
+    const e = req.body.endTime ?? b.endTime;
+    if (!TIME_RE.test(s) || !TIME_RE.test(e)) throw new ApiError(400, "Times must be in HH:MM format");
+    if (s >= e) throw new ApiError(400, "End time must be after start time");
+    if ((b.key === "morning") !== (s < "12:00")) {
+      throw new ApiError(400, `A ${b.key} batch must start ${b.key === "morning" ? "before" : "after"} 12:00`);
+    }
+    b.startTime = s;
+    b.endTime = e;
+  }
+
   await b.save();
   sendResponse(res, 200, "Batch updated", { batch: b });
 });
