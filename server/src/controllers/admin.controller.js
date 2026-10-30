@@ -12,6 +12,8 @@ const Promo = require("../models/Promo");
 const settings = require("../services/settings.service");
 const live = require("../services/live.service");
 const { present, POPULATE } = require("./course.controller");
+const mongoose = require("mongoose");
+const Session = require("../models/Session");
 
 const escapeRegex = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/; // "HH:MM", 24h
@@ -67,7 +69,16 @@ const listCourses = asyncHandler(async (req, res) => {
   const courses = await Course.find().populate(POPULATE).sort({ createdAt: -1 });
   const counts = await Enrollment.aggregate([{ $group: { _id: "$courseId", n: { $sum: 1 } } }]);
   const m = new Map(counts.map((c) => [String(c._id), c.n]));
-  sendResponse(res, 200, "Courses fetched", { items: courses.map((c) => present(c, { learners: m.get(String(c._id)) || 0 })) });
+  const batches = await Batch.find({ courseId: { $in: courses.map((c) => c._id) } }).sort({ startTime: 1 });
+  const slotsBy = new Map();
+  for (const b of batches) {
+    const k = String(b.courseId);
+    if (!slotsBy.has(k)) slotsBy.set(k, []);
+    slotsBy.get(k).push({ startTime: b.startTime, endTime: b.endTime });
+  }
+  sendResponse(res, 200, "Courses fetched", {
+    items: courses.map((c) => ({ ...present(c, { learners: m.get(String(c._id)) || 0 }), slots: slotsBy.get(String(c._id)) || [] })),
+  });
 });
 
 const listBatches = asyncHandler(async (req, res) => {
@@ -91,27 +102,38 @@ const listBatches = asyncHandler(async (req, res) => {
 // PATCH /api/admin/batches/:id  { capacity?, isOpen?, startTime?, endTime? }
 const updateBatch = asyncHandler(async (req, res) => {
   const b = await Batch.findById(req.params.id);
-  const timeChanged = req.body.startTime !== undefined || req.body.endTime !== undefined;
-  await b.save();
-if (timeChanged) await live.rescheduleSessions(b);
   if (!b) throw new ApiError(404, "Batch not found");
   if (Number.isInteger(req.body.capacity) && req.body.capacity > 0) b.capacity = req.body.capacity;
   if (typeof req.body.isOpen === "boolean") b.isOpen = req.body.isOpen;
+  if (typeof req.body.name === "string") b.name = req.body.name.trim();
 
-  if (req.body.startTime !== undefined || req.body.endTime !== undefined) {
-    const s = req.body.startTime ?? b.startTime;
-    const e = req.body.endTime ?? b.endTime;
-    if (!TIME_RE.test(s) || !TIME_RE.test(e)) throw new ApiError(400, "Times must be in HH:MM format");
-    if (s >= e) throw new ApiError(400, "End time must be after start time");
-    if ((b.key === "morning") !== (s < "12:00")) {
-      throw new ApiError(400, `A ${b.key} batch must start ${b.key === "morning" ? "before" : "after"} 12:00`);
-    }
-    b.startTime = s;
-    b.endTime = e;
-  }
-
+  const timeChanged = req.body.startTime !== undefined || req.body.endTime !== undefined;
+if (timeChanged) {
+  const s = req.body.startTime ?? b.startTime;
+  const e = req.body.endTime ?? b.endTime;
+  if (!TIME_RE.test(s) || !TIME_RE.test(e)) throw new ApiError(400, "Invalid time");
+  if (s >= e) throw new ApiError(400, "End time must be after start time (a class cannot cross midnight)");
+  const newKey = live.slotKey(s, e);
+  if (await Batch.exists({ courseId: b.courseId, key: newKey, _id: { $ne: b._id } })) throw new ApiError(409, "This course already has a batch at that time");
+  b.startTime = s;
+  b.endTime = e;
+  b.key = newKey;
+}
   await b.save();
+  if (timeChanged) await live.rescheduleSessions(b);
   sendResponse(res, 200, "Batch updated", { batch: b });
+});
+
+// POST /api/admin/batches  { courseId, startTime, endTime, name?, days?, startDate?, capacity? }
+const createBatch = asyncHandler(async (req, res) => {
+  const { courseId, startTime, endTime } = req.body;
+  const course = await Course.findById(courseId);
+  if (!course) throw new ApiError(404, "Course not found");
+  if (!TIME_RE.test(startTime) || !TIME_RE.test(endTime)) throw new ApiError(400, "Times must be in HH:MM format");
+  if (startTime >= endTime) throw new ApiError(400, "End time must be after start time");
+  if (await Batch.exists({ courseId, key: live.slotKey(startTime, endTime) })) throw new ApiError(409, "This course already has a batch at that time");
+  const batch = await live.createCustomBatch(course, req.body);
+  sendResponse(res, 201, "Batch created", { batch });
 });
 
 // Settings + promo codes
@@ -133,5 +155,68 @@ const togglePromo = asyncHandler(async (req, res) => {
   p.isActive = !p.isActive; await p.save();
   sendResponse(res, 200, "Promo updated", { promo: p });
 });
+// POST /api/admin/batches/:id/start-now  { title? }
+const startBatchNow = asyncHandler(async (req, res) => {
+  const batch = await Batch.findById(req.params.id);
+  if (!batch) throw new ApiError(404, "Batch not found");
+  const course = await Course.findById(batch.courseId);
+  if (!course) throw new ApiError(404, "Course not found");
+  if (await Session.exists({ batchId: batch._id, status: "live" })) throw new ApiError(409, "A class is already live for this batch");
+  const session = await live.startAdHocSession(batch, course, req.body?.title);
+  sendResponse(res, 201, "Class started", { session });
+});
 
-module.exports = { getStats, listUsers, updateUser, createInstructor, listCourses, listBatches, updateBatch, getSettings, updateSettings, listPromos, createPromo, togglePromo };
+// POST /api/admin/courses/:id/start-class  { batchKey?, title? }
+const startCourseClass = asyncHandler(async (req, res) => {
+  const course = await Course.findById(req.params.id);
+  if (!course) throw new ApiError(404, "Course not found");
+  await live.ensureBatches(course);
+  const batch = req.body?.batchId
+    ? await Batch.findOne({ _id: req.body.batchId, courseId: course._id })
+    : await Batch.findOne({ courseId: course._id }).sort({ startTime: 1 });
+  if (!batch) throw new ApiError(404, "Batch not found");
+  if (await Session.exists({ batchId: batch._id, status: "live" })) throw new ApiError(409, "A class is already live for this batch");
+  const session = await live.startAdHocSession(batch, course, req.body?.title);
+  sendResponse(res, 201, "Class started", { session });
+});
+
+
+// DELETE /api/admin/users/:id   body: { reassignTo?: instructorId }
+const deleteUser = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) throw new ApiError(404, "User not found");
+  const user = await User.findById(req.params.id);
+  if (!user) throw new ApiError(404, "User not found");
+  if (String(user._id) === String(req.user._id)) throw new ApiError(400, "You cannot delete your own account");
+  if (user.role === "admin") throw new ApiError(400, "Admin accounts cannot be deleted here");
+
+  if (user.role === "instructor") {
+    const [courses, sessions] = await Promise.all([
+      Course.countDocuments({ instructorId: user._id }),
+      Session.countDocuments({ instructorId: user._id }),
+    ]);
+    if (courses > 0 || sessions > 0) {
+      const to = req.body?.reassignTo;
+      if (!to || !mongoose.isValidObjectId(to)) throw new ApiError(409, `This instructor has ${courses} course(s). Choose another instructor to take them over.`);
+      if (String(to) === String(user._id)) throw new ApiError(400, "Choose a different instructor");
+      const target = await User.findOne({ _id: to, role: "instructor", isActive: true });
+      if (!target) throw new ApiError(400, "The selected instructor was not found or is suspended");
+      await Promise.all([
+        Course.updateMany({ instructorId: user._id }, { instructorId: target._id }),
+        Session.updateMany({ instructorId: user._id }, { instructorId: target._id }),
+      ]);
+    }
+  } else {
+    // students with payments or enrollments keep their records: suspend them instead
+    const [en, pay] = await Promise.all([Enrollment.exists({ userId: user._id }), Payment.exists({ userId: user._id })]);
+    if (en || pay) throw new ApiError(409, "This student has enrollments or payments. Suspend the account instead of deleting it.");
+  }
+
+  await user.deleteOne();
+  sendResponse(res, 200, "User deleted");
+});
+
+module.exports = {
+  getStats, listUsers, updateUser, createInstructor, listCourses,
+  listBatches, updateBatch, createBatch, startBatchNow, startCourseClass,
+  getSettings, updateSettings, listPromos, createPromo, togglePromo, deleteUser,
+};

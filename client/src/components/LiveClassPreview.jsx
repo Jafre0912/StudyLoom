@@ -17,10 +17,13 @@ export default function LiveClassPreview() {
         <div className="absolute inset-0 flex items-center justify-center"><Avatar name={s.instructor} size={72} /></div>
         <span className={`absolute left-2.5 top-2.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold text-white sm:left-3 sm:top-3 sm:text-xs ${isLive ? "bg-rose-600" : "bg-slate-600"}`}>{isLive && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />}{isLive ? "LIVE" : `${fmtDay(s.startsAt)} · ${fmtTime(s.startsAt)}`}</span>
         {isLive && <span className="absolute right-2.5 top-2.5 inline-flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur sm:right-3 sm:top-3 sm:text-xs"><Users size={12} />{s.students} in class</span>}
-        <div className="absolute bottom-2.5 left-2.5 flex gap-2 text-white/80 sm:bottom-3 sm:left-3"><span className="rounded-lg bg-black/40 p-1.5"><Mic size={14} /></span><span className="rounded-lg bg-black/40 p-1.5"><Video size={14} /></span></div>
+        <div className="absolute bottom-2.5 left-2.5 flex gap-2 text-white/80 sm:bottom-3 sm:left-3"><span className="rounded-lg bg-black/40 p-1.5"><Mic size={14} /></span>
+        <span className="rounded-lg bg-black/40 p-1.5"><Video size={14} /></span></div>
       </div>
       <div className="mt-3 flex flex-col gap-3 sm:mt-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0"><p className="line-clamp-2 font-semibold leading-snug">{s.title}</p><p className="mt-0.5 text-sm text-slate-500">{s.instructor} · {s.batch === "morning" ? "Morning" : "Evening"} Batch</p></div>
+        <div className="min-w-0"><p className="line-clamp-2 font-semibold leading-snug">{s.title}</p>
+        <p className="mt-0.5 text-sm text-slate-500">{s.instructor}</p>
+         </div>
         <Link to={isLive ? `/live-class/${s.id}` : `/courses/${s.course.slug}`} className="shrink-0 rounded-xl bg-brand-600 px-4 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-brand-700 sm:py-2">{isLive ? "Join Class" : "View course"}</Link>
       </div>
       <div className="mt-3 flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700"><span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-500" />Attendance is tracked in real time</div>

@@ -6,7 +6,7 @@ const courseSchema = new mongoose.Schema(
     slug: { type: String, required: true, unique: true, lowercase: true },
     description: { type: String, required: true },
     thumbnailUrl: { type: String, default: "" },
-    categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Category" },
+  slots: [{ _id: false, startTime: { type: String, required: true }, endTime: { type: String, required: true } }],    categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Category" },
     instructorId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     price: { type: Number, required: true, default: 0 }, // whole NPR, 0 = free
     oldPrice: { type: Number, default: 0 }, // list price shown struck-through

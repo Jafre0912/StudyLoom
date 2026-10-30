@@ -8,6 +8,11 @@ import { PageHeader, Badge, Button, Modal } from "../../components/ui/index.jsx"
 import { money } from "../../utils/format.js";
 import { Table, Panel } from "./shared.jsx";
 
+const to12 = (t) => {
+  const [h, m] = t.split(":").map(Number);
+  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+};
+
 function CourseForm({ course, onClose, onSaved }) {
   const cats = useCategories().data || [];
   const instructors = useAdmin("instructors", api.fetchInstructors);
@@ -23,13 +28,19 @@ function CourseForm({ course, onClose, onSaved }) {
     classesPerWeek: course?.classesPerWeek || 4,
     thumbnailUrl: course?.thumbnailUrl || "",
     startDate: course?.startDate ? course.startDate.slice(0, 10) : "",
+    slots: course?.slots?.length ? course.slots : [{ startTime: "07:00", endTime: "08:30" }],
     isPublished: course?.isPublished ?? true,
   });
   const [busy, setBusy] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value });
+  const setSlot = (i, key, value) => setF({ ...f, slots: f.slots.map((s, j) => (j === i ? { ...s, [key]: value } : s)) });
 
   const save = async (e) => {
     e.preventDefault();
+    if (f.slots.some((s) => !s.startTime || !s.endTime || s.startTime >= s.endTime)) {
+      toast.error("Every class time needs an end time after its start time");
+      return;
+    }
     setBusy(true);
     try {
       const body = {
@@ -87,9 +98,29 @@ function CourseForm({ course, onClose, onSaved }) {
         {I("weeks", "Weeks", "number", { min: 1 })}
         {I("classesPerWeek", "Classes / week (1–6)", "number", { min: 1, max: 6 })}
         <div className="sm:col-span-2">{I("thumbnailUrl", "Thumbnail URL")}</div>
+
+        <div className="sm:col-span-2">
+          <label className="label">Class times</label>
+          {f.slots.map((s, i) => (
+            <div key={i} className="mt-2 flex flex-wrap items-center gap-2">
+              <input type="time" className="input !w-auto" value={s.startTime} onChange={(e) => setSlot(i, "startTime", e.target.value)} />
+              <span className="text-sm text-slate-500">to</span>
+              <input type="time" className="input !w-auto" value={s.endTime} onChange={(e) => setSlot(i, "endTime", e.target.value)} />
+              <span className="text-xs text-slate-500">{s.startTime && s.endTime ? `${to12(s.startTime)} – ${to12(s.endTime)}` : ""}</span>
+              {f.slots.length > 1 && (
+                <button type="button" className="text-sm text-red-600" onClick={() => setF({ ...f, slots: f.slots.filter((_, j) => j !== i) })}>Remove</button>
+              )}
+            </div>
+          ))}
+          <Button type="button" variant="secondary" size="sm" className="mt-2"
+            onClick={() => setF({ ...f, slots: [...f.slots, { startTime: "19:00", endTime: "20:30" }] })}>
+            + Add time
+          </Button>
+        </div>
+
         <label className="flex items-center gap-2 text-sm sm:col-span-2">
           <input type="checkbox" checked={f.isPublished} onChange={set("isPublished")} className="accent-brand-600" />
-          Published (creates Morning &amp; Evening batches and every live session)
+          Published (creates a batch for every class time and all live sessions)
         </label>
         <div className="flex justify-end gap-2 sm:col-span-2">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>

@@ -14,9 +14,8 @@ const MAX_GAP_S = 45; // never credit more than this between two heartbeats
 
 const oid = (v) => new mongoose.Types.ObjectId(String(v));
 const to12h = (t) => { const [h, m] = t.split(":").map(Number); return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`; };
-const batchLabel = (b) => (b.key === "morning" ? "Morning Batch" : "Evening Batch");
+const batchLabel = (b) => b.name || batchTime(b);
 const batchTime = (b) => `${to12h(b.startTime)} – ${to12h(b.endTime)}`;
-
 // Wall-clock Nepal date/time -> UTC Date
 function nepalDate(y, mo, d, hhmm) {
   const [h, m] = hhmm.split(":").map(Number);
@@ -134,24 +133,36 @@ async function issueCertificatesForBatch(batchId) {
 
 // Class days by classes-per-week (Nepal week: Sun-Fri).
 const WEEKDAYS = { 1: ["Sun"], 2: ["Sun", "Wed"], 3: ["Sun", "Tue", "Thu"], 4: ["Sun", "Mon", "Wed", "Thu"], 5: ["Sun", "Mon", "Tue", "Wed", "Thu"], 6: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri"] };
-const SLOTS = { morning: ["07:00", 7 * 60], evening: ["19:00", 19 * 60] };
 const hhmm = (mins) => `${String(Math.floor(mins / 60) % 24).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
 
 // Makes sure a published course has its Morning + Evening batches and their concrete sessions.
+// Naye course ke liye ek default batch, aur sabke sessions
 async function ensureBatches(course) {
-  for (const key of ["morning", "evening"]) {
-    const [start, startMin] = SLOTS[key];
-    const batch = await Batch.findOneAndUpdate(
-      { courseId: course._id, key },
-      { $setOnInsert: { startTime: start, endTime: hhmm(startMin + (course.minutesPerClass || 90)), days: WEEKDAYS[course.classesPerWeek] || WEEKDAYS[4], startDate: course.startDate, capacity: 30, isOpen: true } },
-      { upsert: true, new: true }
-    );
-    await generateSessions(batch, course);
+  if (!(await Batch.exists({ courseId: course._id }))) {
+    await createCustomBatch(course, { startTime: "07:00", endTime: hhmm(7 * 60 + (course.minutesPerClass || 90)) });
   }
+  for (const b of await Batch.find({ courseId: course._id })) await generateSessions(b, course);
+}
+
+// Course form ke class times ko batches se match karo
+async function syncBatches(course, slots) {
+  if (!Array.isArray(slots) || !slots.length) return ensureBatches(course);
+  const existing = await Batch.find({ courseId: course._id });
+  const same = (b, s) => b.startTime === s.startTime && b.endTime === s.endTime;
+  for (const s of slots) {
+    if (!existing.some((b) => same(b, s))) await createCustomBatch(course, { startTime: s.startTime, endTime: s.endTime });
+  }
+  for (const b of existing) {
+    if (slots.some((s) => same(b, s))) continue;
+    const taken = await Enrollment.countDocuments({ batchId: b._id, status: { $in: ["active", "completed"] } });
+    if (taken === 0) { await Session.deleteMany({ batchId: b._id }); await b.deleteOne(); }
+    else if (b.isOpen) { b.isOpen = false; await b.save(); } // students hain: delete nahi, sirf band
+  }
+  for (const b of await Batch.find({ courseId: course._id })) await generateSessions(b, course);
 }
 
 async function batchesForCourse(courseId) {
-  const batches = await Batch.find({ courseId }).sort({ key: 1 });
+const batches = await Batch.find({ courseId }).sort({ startTime: 1 });
   return Promise.all(batches.map(async (b) => ({ _id: b._id, id: b.key, key: b.key, label: batchLabel(b), time: batchTime(b), days: b.days, startDate: b.startDate, capacity: b.capacity, isOpen: b.isOpen, ...(await seatInfo(b)) })));
 }
 
@@ -174,4 +185,37 @@ async function rescheduleSessions(batch) {
   }));
   return sessions.length;
 }
-module.exports = { ensureBatches, batchesForCourse, generateSessions, seatInfo, batchLabel, batchTime, attendanceStatus, credit, liveCount, liveCounts, enrollmentStats, issueCertificatesForBatch, oid, rescheduleSessions };
+
+const slotKey = (s, e) => `custom-${s.replace(":", "")}-${e.replace(":", "")}`;
+
+// Koi bhi time ka batch banao (+ uske sessions)
+async function createCustomBatch(course, { startTime, endTime, name, days, startDate, capacity }) {
+  const batch = await Batch.create({
+    courseId: course._id, key: slotKey(startTime, endTime), name: name || "",
+    startTime, endTime, days: days?.length ? days : WEEKDAYS[course.classesPerWeek] || WEEKDAYS[4],
+    startDate: startDate || course.startDate || new Date(),
+    capacity: capacity || 30,
+    isOpen: true,
+  });
+  await generateSessions(batch, course);
+  return batch;
+}
+
+// Abhi ke abhi class shuru karo, schedule ke bahar
+async function startAdHocSession(batch, course, title) {
+  const now = new Date();
+  const [bh, bm] = batch.startTime.split(":").map(Number);
+  const [eh, em] = batch.endTime.split(":").map(Number);
+  const durationMin = eh * 60 + em - (bh * 60 + bm) || course.minutesPerClass || 90;
+  const count = await Session.countDocuments({ batchId: batch._id });
+  return Session.create({
+    courseId: course._id, batchId: batch._id, instructorId: course.instructorId,
+    title: title || `${course.title} · Lesson ${count + 1}`, moduleTitle: "Live class",
+    startsAt: now, startedAt: now, durationMin, status: "live",
+  });
+}
+module.exports = {
+  ensureBatches, syncBatches, createCustomBatch, slotKey, rescheduleSessions, startAdHocSession,
+  batchesForCourse, generateSessions, seatInfo, batchLabel, batchTime, attendanceStatus,
+  credit, liveCount, liveCounts, enrollmentStats, issueCertificatesForBatch, oid,
+};

@@ -74,3 +74,7 @@ export const fetchAdminCategories = () => http.get("/categories/admin/all").then
 export const createCategory = (body) => http.post("/categories", body);
 export const updateCategory = (cid, body) => http.patch(`/categories/${cid}`, body);
 export const deleteCategory = (cid) => http.delete(`/categories/${cid}`);
+export const deleteAdminUser = (uid, body = {}) => http.delete(`/admin/users/${uid}`, { data: body });
+export const startBatchNow = (id, body = {}) => http.post(`/admin/batches/${id}/start-now`, body).then((r) => r.data);
+export const createBatch = (body) => http.post("/admin/batches", body).then((r) => r.data);
+export const createInstructor = (body) => http.post("/admin/instructors", body).then((r) => r.data);

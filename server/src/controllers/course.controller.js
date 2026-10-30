@@ -13,6 +13,21 @@ const live = require("../services/live.service");
 const POPULATE = [{ path: "categoryId", select: "name slug" }, { path: "instructorId", select: "name avatarUrl title bio" }];
 const escapeRegex = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+const cleanSlots = (slots) => {
+  const seen = new Set();
+  return slots.map((s) => {
+    if (!TIME_RE.test(s?.startTime) || !TIME_RE.test(s?.endTime)) throw new ApiError(400, "Class times must be valid");
+    if (s.startTime >= s.endTime) throw new ApiError(400, "End time must be after start time");
+    const k = `${s.startTime}-${s.endTime}`;
+    if (seen.has(k)) throw new ApiError(400, "Same time added twice");
+    seen.add(k);
+    return { startTime: s.startTime, endTime: s.endTime };
+  });
+};
+const syncCourseBatches = (course, body) =>
+  Array.isArray(body.slots) && body.slots.length ? live.syncBatches(course, cleanSlots(body.slots)) : live.ensureBatches(course);
+
 // The JSON shape the client consumes (real learner counts, real batch keys).
 const present = (c, extra = {}) => ({
   _id: c._id, slug: c.slug, title: c.title, description: c.description, thumbnailUrl: c.thumbnailUrl,
@@ -64,19 +79,20 @@ const createCourse = asyncHandler(async (req, res) => {
   FIELDS.forEach((f) => { if (req.body[f] !== undefined && req.body[f] !== "") data[f] = req.body[f]; });
   data.instructorId = req.user.role === "admin" && req.body.instructorId ? req.body.instructorId : req.user._id;
   if (req.body.isPublished === undefined) data.isPublished = true;
+  if (Array.isArray(req.body.slots)) cleanSlots(req.body.slots); // galat time ho toh course banne se pehle hi error
   const course = await Course.create(data);
-  if (course.isPublished) await live.ensureBatches(course);
+  if (course.isPublished) await syncCourseBatches(course, req.body);
   sendResponse(res, 201, "Course created", { course: present(await course.populate(POPULATE)) });
 });
 
-// PUT /api/courses/:id
 const updateCourse = asyncHandler(async (req, res) => {
   const course = await Course.findById(req.params.id);
   if (!course) throw new ApiError(404, "Course not found");
   if (req.user.role === "instructor" && String(course.instructorId) !== String(req.user._id)) throw new ApiError(403, "You can only edit your own courses");
+  if (Array.isArray(req.body.slots)) cleanSlots(req.body.slots);
   FIELDS.forEach((f) => { if (req.body[f] !== undefined && !(f === "instructorId" && req.user.role !== "admin")) course[f] = req.body[f]; });
   await course.save();
-  if (course.isPublished) await live.ensureBatches(course);
+  if (course.isPublished) await syncCourseBatches(course, req.body);
   sendResponse(res, 200, "Course updated", { course: present(await course.populate(POPULATE)) });
 });
 
