@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { Video, Users, Clock, Play, TrendingUp, LayoutDashboard } from "lucide-react";
+import { Video, Users, Clock, Play, TrendingUp, LayoutDashboard, ExternalLink} from "lucide-react";
+import { MYCLASS_URL } from "./myclass/base.js";
 import DashboardLayout from "../layouts/DashboardLayout.jsx";
 import { useInstructorOverview, useSessions, useRoster, useStartSession } from "../hooks/queries.js";
 import { PageHeader, StatCard, Button, Badge, Avatar, ProgressBar, Skeleton, ErrorState, EmptyState, statusTone } from "../components/ui/index.jsx";
@@ -13,6 +14,7 @@ export default function InstructorDashboard() {
   const ov = useInstructorOverview(); const ss = useSessions();
   const start = useStartSession();
   const nav = useNavigate();
+  const openMyClass = () => (MYCLASS_URL.startsWith("http") ? (window.location.href = MYCLASS_URL) : nav(MYCLASS_URL));
   const [picked, setPicked] = useState(null);
   const mine = (ss.data || []).filter((s) => s.status !== "completed");
   const focus = picked || mine.find((s) => s.status === "live")?.id || mine[0]?.id;
@@ -24,7 +26,10 @@ export default function InstructorDashboard() {
   const fs = mine.find((s) => s.id === focus);
   return (
     <>
-      <PageHeader title="Instructor Dashboard" subtitle="Manage classes, rosters and live attendance." />
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+       <PageHeader title="Instructor Dashboard" subtitle="Manage classes, rosters and live attendance." />
+       <Button variant="secondary" size="sm" onClick={openMyClass}><ExternalLink size={15} />Open MyClass</Button>
+        </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={Video} label="Live now" value={o.liveNow} tone="rose" /><StatCard icon={Clock} label="Upcoming classes" value={o.upcoming} tone="amber" />
         <StatCard icon={Users} label="Enrolled students" value={o.students} /><StatCard icon={TrendingUp} label="Avg. attendance" value={o.avgAttendance == null ? "—" : `${o.avgAttendance}%`} tone="green" hint={o.avgAttendance == null ? "After your first class" : undefined} />

@@ -45,7 +45,8 @@ export default function LiveRoomPage() {
   if (isLoading) return <div className="flex h-screen items-center justify-center bg-slate-900 p-10"><Skeleton className="h-96 w-full max-w-4xl bg-slate-700" /></div>;
   if (error) return <div className="flex h-screen items-center justify-center bg-slate-900 p-6"><div className="w-full max-w-md"><ErrorState error={error} onRetry={refetch} /><Button variant="secondary" className="mt-3 w-full" onClick={() => nav(-1)}>Go back</Button></div></div>;
 
-  const back = isHost ? (user.role === "admin" ? "/admin" : "/instructor/dashboard") : inPortal ? MC("/classes") : "/dashboard/live-classes";  const leave = async () => { if (isStudent && joined.current) await api.leaveSession(sessionId).catch(() => {}); nav(back); };
+  const back = inPortal ? MC("/classes") : isHost ? (user.role === "admin" ? "/admin" : "/instructor/dashboard") : "/dashboard/live-classes"; 
+  const leave = async () => { if (isStudent && joined.current) await api.leaveSession(sessionId).catch(() => {}); nav(back); };
   const start = async () => { try { await api.startSession(sessionId); await refetch(); } catch (e) { toast.error(e.message); } };
   const end = async () => {
     if (!window.confirm("End this class for everyone?")) return;
