@@ -9,7 +9,7 @@ export const useLearningPaths = () => useQuery({ queryKey: ["paths"], queryFn: a
 export const usePublicSessions = () => useQuery({ queryKey: ["public-sessions"], queryFn: api.fetchPublicSessions, refetchInterval: 30000 });
 export const useCheckout = (courseId) => useQuery({ queryKey: ["checkout", courseId], queryFn: () => api.fetchCheckout(courseId), retry: false, gcTime: 0 });
 export const useEnrollments = (opts = {}) => useQuery({ queryKey: ["enrollments"], queryFn: api.fetchEnrollments, ...opts });
-export const useSessions = () => useQuery({ queryKey: ["sessions"], queryFn: api.fetchSessions, refetchInterval: 30000 });
+export const useSessions = () => useQuery({ queryKey: ["sessions"], queryFn: api.fetchSessions, refetchInterval: 10000,  refetchOnWindowFocus: true});
 export const useSession = (sid) => useQuery({ queryKey: ["session", sid], queryFn: () => api.fetchSession(sid), retry: false, refetchInterval: 15000 });
 export const useAttendance = () => useQuery({ queryKey: ["attendance"], queryFn: api.fetchAttendance });
 export const useCertificates = () => useQuery({ queryKey: ["certificates"], queryFn: api.fetchCertificates });

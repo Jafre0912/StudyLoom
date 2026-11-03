@@ -31,7 +31,9 @@ export default function InstructorDashboard() {
       </div>
       <h2 className="mb-3 mt-8 font-semibold">My classes</h2>
       {mine.length === 0 ? <EmptyState icon={Video} title="No upcoming classes" text="Classes appear here once a course assigned to you has a batch." /> : <div className="space-y-3">{mine.slice(0, 8).map((s) => (
-        <div key={s.id} className={`card flex flex-wrap items-center gap-4 p-4 ${focus === s.id ? "ring-2 ring-brand-200" : ""}`}><button onClick={() => setPicked(s.id)} className="min-w-[12rem] flex-1 text-left"><div className="flex items-center gap-2"><Badge tone={statusTone[s.status]} className="capitalize">{s.status}</Badge><span className="text-xs text-slate-500">{fmtDay(s.startsAt)} · {fmtTime(s.startsAt)}</span></div><p className="mt-1 font-semibold">{s.title}</p><p className="text-sm text-slate-500">{s.course?.title} · {s.batch} batch</p></button>
+        <div key={s.id} className={`card flex flex-wrap items-center gap-4 p-4 ${focus === s.id ? "ring-2 ring-brand-200" : ""}`}><button onClick={() => setPicked(s.id)} className="min-w-[12rem] flex-1 text-left"><div className="flex items-center gap-2"><Badge tone={statusTone[s.status]} className="capitalize">{s.status}</Badge><span className="text-xs text-slate-500">{fmtDay(s.startsAt)} · {fmtTime(s.startsAt)}</span></div><p className="mt-1 font-semibold">{s.title}</p>
+        <p className="text-sm text-slate-500">{s.course?.title} · {s.batchTime || "—"}</p>
+        </button>
           <Button loading={start.isPending && start.variables === s.id} onClick={() => go(s)} variant={s.status === "live" ? "primary" : "secondary"}><Play size={15} />{s.status === "live" ? "Rejoin class" : "Start class"}</Button></div>))}</div>}
       {fs && <><h2 className="mb-3 mt-8 font-semibold">Roster & attendance <span className="text-sm font-normal text-slate-500">· {fs.title}</span></h2>
         {roster.isLoading ? <Skeleton className="h-40" /> : roster.error ? <ErrorState error={roster.error} onRetry={roster.refetch} /> : roster.data.length === 0 ? <EmptyState icon={Users} title="No students in this batch yet" /> : (

@@ -5,6 +5,7 @@ import { Eye, EyeOff, Lock, Mail, Phone, User, Video, Users, Award } from "lucid
 import { Logo, Button } from "../components/ui/index.jsx";
 import { useAuth, homeFor } from "../context/AuthContext.jsx";
 
+
 /* ---------- Shared split-screen layout ---------- */
 function Shell({ title, sub, children, foot }) {
   return (

@@ -7,12 +7,18 @@ const Enrollment = require("../models/Enrollment");
 const User = require("../models/User");
 const live = require("../services/live.service");
 
-const POP = [{ path: "courseId", select: "title slug thumbnailUrl" }, { path: "batchId", select: "key" }, { path: "instructorId", select: "name" }];
+const POP = [
+  { path: "courseId", select: "title slug thumbnailUrl" },
+  { path: "batchId", select: "key name startTime endTime" },
+  { path: "instructorId", select: "name" },
+];
 const JITSI = () => process.env.JITSI_DOMAIN || "meet.jit.si";
 
 const view = (s, liveStudents = 0) => ({
   _id: s._id, title: s.title, moduleTitle: s.moduleTitle, startsAt: s.startsAt, durationMin: s.durationMin,
-  status: s.status, course: s.courseId, batch: s.batchId?.key, instructor: s.instructorId?.name,
+  status: s.status, course: s.courseId, batch: s.batchId?.key, batchId: s.batchId?._id,
+  batchTime: s.batchId?.startTime ? live.batchTime(s.batchId) : "",
+  instructor: s.instructorId?.name,
   students: s.status === "live" ? liveStudents : 0,
 });
 
@@ -37,6 +43,13 @@ async function authorise(req, id, { hostOnly = false } = {}) {
   return { s, isHost };
 }
 
+// Live class ko theek se band karo: andar baithe students ka time jodo, phir completed mark karo.
+async function closeSession(s, now = new Date()) {
+  const open = await Attendance.find({ sessionId: s._id, leftAt: null });
+  for (const a of open) { live.credit(a, now); a.leftAt = now; await a.save(); }
+  s.status = "completed"; s.endedAt = now; await s.save();
+}
+
 // GET /api/sessions/me
 const mySessions = asyncHandler(async (req, res) => {
   const u = req.user;
@@ -59,27 +72,26 @@ const publicSessions = asyncHandler(async (req, res) => {
 const getSession = asyncHandler(async (req, res) => {
   const { s, isHost } = await authorise(req, req.params.id);
   const data = view(s, await live.liveCount(s._id));
-  if (s.status === "live" || isHost) data.roomUrl = `https://${JITSI()}/studyloom-${s._id}`;
-  sendResponse(res, 200, "Session fetched", { session: { ...data, isHost } });
+if (s.status === "live" || isHost) data.roomUrl = `https://${JITSI()}/studyloom-b-${s.batchId._id}`;  sendResponse(res, 200, "Session fetched", { session: { ...data, isHost } });
 });
 
-// POST /api/sessions/:id/start  (instructor/admin; allowed any time so you can test)
 const startSession = asyncHandler(async (req, res) => {
   const { s, isHost } = await authorise(req, req.params.id);
   if (!isHost) throw new ApiError(403, "Only the instructor can start this class");
   if (s.status === "completed") throw new ApiError(409, "This class has already ended");
-  if (s.status !== "live") { s.status = "live"; s.startedAt = new Date(); await s.save(); }
+  if (s.status !== "live") {
+    // Ek batch mein ek hi live class: purani atki hui class band karo, taaki sab ek hi room mein aayein.
+    const stale = await Session.find({ batchId: s.batchId._id, status: "live", _id: { $ne: s._id } });
+    for (const o of stale) await closeSession(o);
+    s.status = "live"; s.startedAt = new Date(); await s.save();
+  }
   sendResponse(res, 200, "Class started", { session: view(s) });
 });
 
-// POST /api/sessions/:id/end
 const endSession = asyncHandler(async (req, res) => {
   const { s, isHost } = await authorise(req, req.params.id);
   if (!isHost) throw new ApiError(403, "Only the instructor can end this class");
-  const now = new Date();
-  const open = await Attendance.find({ sessionId: s._id, leftAt: null });
-  for (const a of open) { live.credit(a, now); a.leftAt = now; await a.save(); }
-  s.status = "completed"; s.endedAt = now; await s.save();
+  await closeSession(s);
   const issued = await live.issueCertificatesForBatch(s.batchId._id);
   sendResponse(res, 200, "Class ended", { certificatesIssued: issued });
 });

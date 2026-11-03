@@ -28,6 +28,7 @@ import AdminPromos from "../pages/admin/AdminPromos.jsx";
 import AdminSettings from "../pages/admin/AdminSettings.jsx";
 import AdminCashPayments from "../pages/admin/AdminCashPayments.jsx";
 import AdminCategories from "../pages/admin/AdminCategories.jsx";
+import MyClassRoutes from "../pages/myclass/MyClassRoutes.jsx";
 
 export default function AppRoutes() {
   return (
@@ -46,6 +47,7 @@ export default function AppRoutes() {
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Route>
+       <Route path="/myclass/*" element={<MyClassRoutes />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
 
