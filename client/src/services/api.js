@@ -78,3 +78,5 @@ export const deleteAdminUser = (uid, body = {}) => http.delete(`/admin/users/${u
 export const startBatchNow = (id, body = {}) => http.post(`/admin/batches/${id}/start-now`, body).then((r) => r.data);
 export const createBatch = (body) => http.post("/admin/batches", body).then((r) => r.data);
 export const createInstructor = (body) => http.post("/admin/instructors", body).then((r) => r.data);
+export const fetchRoomToken = (id) => http.post(`/sessions/${id}/token`).then((r) => r.data);
+export const setShareAccess = (id, body) => http.post(`/sessions/${id}/share`, body).then((r) => r.data);

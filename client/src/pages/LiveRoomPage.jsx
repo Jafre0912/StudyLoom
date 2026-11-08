@@ -26,7 +26,6 @@ export default function LiveRoomPage() {
   const isHost = !!s?.isHost;
   const isStudent = user?.role === "student";
 
-
   useEffect(() => {
     if (!s || s.status !== "live" || !isStudent || joined.current) return;
     joined.current = true;
@@ -45,7 +44,7 @@ export default function LiveRoomPage() {
   if (isLoading) return <div className="flex h-screen items-center justify-center bg-slate-900 p-10"><Skeleton className="h-96 w-full max-w-4xl bg-slate-700" /></div>;
   if (error) return <div className="flex h-screen items-center justify-center bg-slate-900 p-6"><div className="w-full max-w-md"><ErrorState error={error} onRetry={refetch} /><Button variant="secondary" className="mt-3 w-full" onClick={() => nav(-1)}>Go back</Button></div></div>;
 
-  const back = inPortal ? MC("/classes") : isHost ? (user.role === "admin" ? "/admin" : "/instructor/dashboard") : "/dashboard/live-classes"; 
+  const back = inPortal ? MC("/classes") : isHost ? (user.role === "admin" ? "/admin" : "/instructor/dashboard") : "/dashboard/live-classes";
   const leave = async () => { if (isStudent && joined.current) await api.leaveSession(sessionId).catch(() => {}); nav(back); };
   const start = async () => { try { await api.startSession(sessionId); await refetch(); } catch (e) { toast.error(e.message); } };
   const end = async () => {
@@ -60,7 +59,7 @@ export default function LiveRoomPage() {
   // Live class: full custom classroom UI
   if (s.status === "live" && !joinErr) {
     return (
-      <div className="relative h-screen">
+      <div className="relative" style={{ height: "100dvh" }}>
         <ClassRoom
           roomName={`studyloom-b-${s.batchId || sessionId}`}
           displayName={user.name}
@@ -84,16 +83,33 @@ export default function LiveRoomPage() {
     <div className="flex h-screen flex-col bg-slate-950 text-white">
       <header className="flex flex-wrap items-center gap-3 border-b border-white/10 px-4 py-3">
         {s.status === "live" ? <Badge tone="rose"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-500" />LIVE</Badge> : <Badge tone="gray" className="capitalize">{s.status}</Badge>}
-        <div className="min-w-0"><p className="truncate text-sm font-semibold">{s.title}</p><p className="truncate text-xs text-slate-400">{s.course?.title} · {s.instructor}</p></div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold">{s.title}</p>
+          <p className="truncate text-xs text-slate-400">{s.course?.title} · {s.instructor}</p>
+        </div>
         <div className="ml-auto flex flex-wrap items-center gap-2 text-xs">
           {isHost && s.status === "live" && <Button size="sm" variant="danger" loading={endMut.isPending} onClick={end}><Square size={13} />End class</Button>}
           <Button size="sm" variant="secondary" onClick={leave}><PhoneOff size={14} />Leave</Button>
         </div>
       </header>
       <div className="min-h-0 flex-1">
-        {joinErr ? <div className="flex h-full items-center justify-center p-6"><div className="max-w-sm text-center"><p className="font-semibold">Could not join</p><p className="mt-1 text-sm text-slate-400">{joinErr}</p><Button className="mt-4" onClick={() => nav(back)}>Back</Button></div></div>
-        : s.status === "completed" ? <div className="flex h-full items-center justify-center text-slate-400">This class has ended.</div>
-        : <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center"><Radio className="text-slate-500" size={40} /><p className="text-lg font-semibold">{isHost ? "This class has not started yet" : "Waiting for the instructor to start the class"}</p>{isHost ? <Button size="lg" onClick={start}>Start class now</Button> : <Button variant="secondary" onClick={() => refetch()}>Refresh</Button>}</div>}
+        {joinErr ? (
+          <div className="flex h-full items-center justify-center p-6">
+            <div className="max-w-sm text-center">
+              <p className="font-semibold">Could not join</p>
+              <p className="mt-1 text-sm text-slate-400">{joinErr}</p>
+              <Button className="mt-4" onClick={() => nav(back)}>Back</Button>
+            </div>
+          </div>
+        ) : s.status === "completed" ? (
+          <div className="flex h-full items-center justify-center text-slate-400">This class has ended.</div>
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+            <Radio className="text-slate-500" size={40} />
+            <p className="text-lg font-semibold">{isHost ? "This class has not started yet" : "Waiting for the instructor to start the class"}</p>
+            {isHost ? <Button size="lg" onClick={start}>Start class now</Button> : <Button variant="secondary" onClick={() => refetch()}>Refresh</Button>}
+          </div>
+        )}
       </div>
     </div>
   );

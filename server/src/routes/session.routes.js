@@ -13,4 +13,6 @@ router.post("/:id/end", protect, restrictTo("admin", "instructor"), c.endSession
 router.post("/:id/join", protect, c.join);
 router.post("/:id/heartbeat", protect, c.heartbeat);
 router.post("/:id/leave", protect, c.leave);
+router.post("/:id/token", c.roomToken);
+router.post("/:id/share", c.shareAccess);
 module.exports = router;

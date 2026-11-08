@@ -6,6 +6,8 @@ const Attendance = require("../models/Attendance");
 const Enrollment = require("../models/Enrollment");
 const User = require("../models/User");
 const live = require("../services/live.service");
+const lk = require("../services/livekit.service");
+const roomOf = (s) => `studyloom-b-${s.batchId._id}`; // ek batch ka ek hi room
 
 const POP = [
   { path: "courseId", select: "title slug thumbnailUrl" },
@@ -161,4 +163,20 @@ const myAttendance = asyncHandler(async (req, res) => {
   sendResponse(res, 200, "Attendance fetched", { items });
 });
 
-module.exports = { mySessions, publicSessions, getSession, startSession, endSession, join, heartbeat, leave, roster, myAttendance };
+// POST /api/sessions/:id/token  -> LiveKit room ka token (host ya enrolled student ke liye)
+const roomToken = asyncHandler(async (req, res) => {
+  const { s, isHost } = await authorise(req, req.params.id);
+  if (s.status !== "live" && !isHost) throw new ApiError(409, "This class is not live yet");
+  const token = await lk.makeToken({ room: roomOf(s), user: req.user, isHost });
+  sendResponse(res, 200, "Token issued", { token, url: process.env.LIVEKIT_URL, identity: String(req.user._id) });
+});
+
+// POST /api/sessions/:id/share  { identity, allow }  (sirf teacher)
+const shareAccess = asyncHandler(async (req, res) => {
+  const { s, isHost } = await authorise(req, req.params.id, { hostOnly: true });
+  if (!isHost) throw new ApiError(403, "Only the instructor can do that");
+  await lk.setShareAllowed(roomOf(s), String(req.body.identity), !!req.body.allow);
+  sendResponse(res, 200, "Updated");
+});
+
+module.exports = { mySessions, publicSessions, getSession, startSession, endSession, join, heartbeat, leave, roster, myAttendance, roomToken, shareAccess };
