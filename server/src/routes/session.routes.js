@@ -15,4 +15,5 @@ router.post("/:id/heartbeat", protect, c.heartbeat);
 router.post("/:id/leave", protect, c.leave);
 router.post("/:id/token", c.roomToken);
 router.post("/:id/share", c.shareAccess);
+router.post("/:id/jaas-token", c.jaasToken);
 module.exports = router;

@@ -2,6 +2,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/apiError");
 const sendResponse = require("../utils/apiResponse");
 const Session = require("../models/Session");
+const jwt = require("jsonwebtoken");
 const Attendance = require("../models/Attendance");
 const Enrollment = require("../models/Enrollment");
 const User = require("../models/User");
@@ -161,6 +162,33 @@ const myAttendance = asyncHandler(async (req, res) => {
     return { _id: s._id, date: s.startsAt, course: s.courseId, title: s.title, joinedAt: a?.joinedAt || null, leftAt: a?.leftAt || null, minutes: Math.floor(secs / 60), durationMin: s.durationMin, status: live.attendanceStatus(secs, s.durationMin) };
   });
   sendResponse(res, 200, "Attendance fetched", { items });
+});
+
+
+const jwt = require("jsonwebtoken");
+
+// POST /api/sessions/:id/jaas-token  -> JaaS room ka login token
+const jaasToken = asyncHandler(async (req, res) => {
+  const { s, isHost } = await authorise(req, req.params.id);
+  if (s.status !== "live" && !isHost) throw new ApiError(409, "This class is not live yet");
+  const appId = process.env.JAAS_APP_ID;
+  const kid = process.env.JAAS_KID;
+  const key = String(process.env.JAAS_PRIVATE_KEY || "").replace(/\\n/g, "\n");
+  if (!appId || !kid || !key) throw new ApiError(500, "JaaS is not configured");
+  const now = Math.floor(Date.now() / 1000);
+  const token = jwt.sign(
+    {
+      aud: "jitsi", iss: "chat", sub: appId, room: "*",
+      iat: now, nbf: now - 10, exp: now + 4 * 3600,
+      context: {
+        user: { id: String(req.user._id), name: req.user.name, email: req.user.email, moderator: isHost ? "true" : "false" },
+        features: { livestreaming: "false", recording: "false", transcription: "false", "outbound-call": "false" },
+      },
+    },
+    key,
+    { algorithm: "RS256", header: { alg: "RS256", kid, typ: "JWT" } }
+  );
+  sendResponse(res, 200, "Token issued", { appId, token, room: `studyloom-b-${s.batchId._id}` });
 });
 
 // POST /api/sessions/:id/token  -> LiveKit room ka token (host ya enrolled student ke liye)

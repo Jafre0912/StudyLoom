@@ -7,12 +7,16 @@ const CTL = "[[SL]]"; // chhupe control sandesh (share permission, teacher ki sc
 
 const DESKTOP_Q = "(min-width: 768px) and (min-height: 521px)";
 const COMPACT_Q = "(orientation: landscape) and (max-height: 520px)"; // phone landscape
+// Phone ke browsers screen capture support nahi karte (sirf laptop/desktop pe hota hai)
+{CAN_CAPTURE && (
+  <Btn sm={compact} title={isInstructor || canShare ? "Share screen" : "Ask the teacher to let you share your screen"} on={sharing} dim={!isInstructor && !canShare} onClick={share}><MonitorUp size={20} /></Btn>
+)}
 
-const loadApi = () =>
+const loadApi = (domain, appId) =>
   new Promise((resolve, reject) => {
     if (window.JitsiMeetExternalAPI) return resolve();
     const s = document.createElement("script");
-    s.src = `https://${DOMAIN}/external_api.js`;
+    s.src = appId ? `https://${domain}/${appId}/external_api.js` : `https://${domain}/external_api.js`;
     s.async = true;
     s.onload = resolve;
     s.onerror = () => reject(new Error("Could not load the class room"));
@@ -49,8 +53,7 @@ const Btn = ({ on, danger, dim, sm, badge, title, onClick, children }) => (
   </button>
 );
 
-export default function ClassRoom({ roomName, displayName, email, subject, isInstructor, onLeave, onEnd }) {
-  const box = useRef(null);
+export default function ClassRoom({ roomName, displayName, email, subject, isInstructor, onLeave, onEnd, jaas }) {  const box = useRef(null);
   const api = useRef(null);
   const chatEnd = useRef(null);
   const ids = useRef({ me: null, host: null, hostSharing: false });
@@ -109,9 +112,10 @@ export default function ClassRoom({ roomName, displayName, email, subject, isIns
     loadApi()
       .then(() => {
         if (dead || !box.current) return;
-        j = new window.JitsiMeetExternalAPI(DOMAIN, {
-          roomName,
-          parentNode: box.current,
+        j = new window.JitsiMeetExternalAPI(jaas ? "8x8.vc" : DOMAIN, {
+          roomName: jaas ? `${jaas.appId}/${jaas.room}` : roomName,
+           jwt: jaas?.token,
+            parentNode: box.current,
           width: "100%",
           height: "100%",
           userInfo: { displayName, email },
