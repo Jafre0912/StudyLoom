@@ -80,4 +80,4 @@ export const createBatch = (body) => http.post("/admin/batches", body).then((r) 
 export const createInstructor = (body) => http.post("/admin/instructors", body).then((r) => r.data);
 export const fetchRoomToken = (id) => http.post(`/sessions/${id}/token`).then((r) => r.data);
 export const setShareAccess = (id, body) => http.post(`/sessions/${id}/share`, body).then((r) => r.data);
-export const fetchJaasToken = (id) => http.post(`/sessions/${id}/jaas-token`).then((r) => r.data);
+export const fetchJaasToken = (id) => http.post(`/sessions/${id}/jaas-token`); /* aur wahi ant jo joinSession mein hai */;
