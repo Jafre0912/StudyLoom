@@ -9,6 +9,7 @@ import { Badge, ErrorState, Skeleton, Button } from "../components/ui/index.jsx"
 import { clock } from "../utils/format.js";
 import ClassRoom from "./myclass/ClassRoom.jsx";
 import { MC, IS_MYCLASS_HOST } from "./myclass/base.js";
+
 const USE_JAAS = import.meta.env.VITE_USE_JAAS === "1";
 
 // Real video room (Jitsi, custom UI via ClassRoom). Attendance is credited by the SERVER from join + 30s heartbeats,
@@ -23,10 +24,19 @@ export default function LiveRoomPage() {
   const endMut = useEndSession();
   const [att, setAtt] = useState({ seconds: 0, status: "absent", classLive: true });
   const [joinErr, setJoinErr] = useState("");
+  const [jaas, setJaas] = useState(null);
+  const [tick, setTick] = useState(0);
   const joined = useRef(false);
   const isHost = !!s?.isHost;
   const isStudent = user?.role === "student";
-  
+
+  // JaaS: class live hote hi room ka login token lo
+  useEffect(() => {
+    if (!USE_JAAS || !s || s.status !== "live") return;
+    api.fetchJaasToken(sessionId).then(setJaas).catch((e) => setJoinErr(e.message));
+  }, [s?.status, sessionId]);
+
+  // Student attendance: join + 30s heartbeat
   useEffect(() => {
     if (!s || s.status !== "live" || !isStudent || joined.current) return;
     joined.current = true;
@@ -38,10 +48,10 @@ export default function LiveRoomPage() {
   }, [s?.status, isStudent, sessionId]);
 
   // smooth local tick between heartbeats
-  const [tick, setTick] = useState(0);
   useEffect(() => { const t = setInterval(() => setTick((v) => v + 1), 1000); return () => clearInterval(t); }, []);
   useEffect(() => { setTick(0); }, [att.seconds]);
 
+  // ---- yahan se neeche koi hook nahi, sirf early returns ----
   if (isLoading) return <div className="flex h-screen items-center justify-center bg-slate-900 p-10"><Skeleton className="h-96 w-full max-w-4xl bg-slate-700" /></div>;
   if (error) return <div className="flex h-screen items-center justify-center bg-slate-900 p-6"><div className="w-full max-w-md"><ErrorState error={error} onRetry={refetch} /><Button variant="secondary" className="mt-3 w-full" onClick={() => nav(-1)}>Go back</Button></div></div>;
 
@@ -57,29 +67,24 @@ export default function LiveRoomPage() {
   const pct = Math.min(100, Math.round((secs / (s.durationMin * 60)) * 100));
   const tone = att.status === "present" ? "bg-emerald-500/20 text-emerald-300" : att.status === "partial" ? "bg-amber-500/20 text-amber-300" : "bg-white/10 text-slate-300";
 
-  const [jaas, setJaas] = useState(null);
-useEffect(() => {
-  if (!USE_JAAS || !s || s.status !== "live") return;
-  api.fetchJaasToken(sessionId).then(setJaas).catch((e) => setJoinErr(e.message));
-}, [s?.status, sessionId]);
   // Live class: full custom classroom UI
   if (s.status === "live" && !joinErr) {
     return (
       <div className="relative" style={{ height: "100dvh" }}>
-{USE_JAAS && !jaas ? (
-  <div className="flex h-full items-center justify-center bg-[#0b1220] text-slate-300">Joining class…</div>
-) : (
-  <ClassRoom
-    roomName={`studyloom-b-${s.batchId || sessionId}`}
-    jaas={jaas}
-    displayName={user.name}
-    email={user.email}
-    subject={`${s.course?.title} · ${s.title}`}
-    isInstructor={isHost}
-    onLeave={leave}
-    onEnd={isHost ? end : undefined}
-  />
-)}
+        {USE_JAAS && !jaas ? (
+          <div className="flex h-full items-center justify-center bg-[#0b1220] text-slate-300">Joining class…</div>
+        ) : (
+          <ClassRoom
+            roomName={`studyloom-b-${s.batchId || sessionId}`}
+            jaas={jaas}
+            displayName={user.name}
+            email={user.email}
+            subject={`${s.course?.title} · ${s.title}`}
+            isInstructor={isHost}
+            onLeave={leave}
+            onEnd={isHost ? end : undefined}
+          />
+        )}
         {isStudent && (
           <span className={`pointer-events-none absolute left-1/2 top-3 z-10 hidden -translate-x-1/2 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold sm:flex ${tone}`}>
             <ShieldCheck size={13} />Attendance: <span className="capitalize">{att.status}</span> · {clock(secs)} ({pct}%)
