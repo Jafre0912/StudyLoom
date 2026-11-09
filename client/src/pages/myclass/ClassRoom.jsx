@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, MonitorUp, Send, VolumeX, Maximize, Minimize, MessageSquare, X } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, MonitorUp, Send, VolumeX, Maximize, Minimize, MessageSquare, X, ZoomIn, Expand } from "lucide-react";
 
 const DOMAIN = import.meta.env.VITE_JITSI_DOMAIN || "meet.jit.si";
 const CTL = "[[SL]]"; // chhupe control sandesh (share permission, teacher ki screen). Chat mein nahi dikhte.
@@ -52,8 +52,12 @@ const Btn = ({ on, danger, dim, sm, badge, title, onClick, children }) => (
   </button>
 );
 
+const ZOOMS = [1, 1.5, 2, 3];
+
 export default function ClassRoom({ roomName, displayName, email, subject, isInstructor, onLeave, onEnd, jaas }) {
   const box = useRef(null);
+  const stageRef = useRef(null);
+  const dragRef = useRef(null);
   const api = useRef(null);
   const chatEnd = useRef(null);
   const ids = useRef({ me: null, host: null, hostSharing: false });
@@ -83,8 +87,14 @@ export default function ClassRoom({ roomName, displayName, email, subject, isIns
   const [chatOpen, setChatOpen] = useState(() => window.matchMedia(DESKTOP_Q).matches);
   const [unread, setUnread] = useState(0);
   const [fs, setFs] = useState(false);
+  const [showUi, setShowUi] = useState(false);       // immersive mode mein controls wapas dikhao
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const chatOpenRef = useRef(chatOpen);
   chatOpenRef.current = chatOpen;
+
+  // Phone/tablet pe student ko teacher ki screen poori jagah mein dikhao (bars chhupa do)
+  const immersive = !desktop && !isInstructor && hostSharing && !showUi;
 
   const cmd = (...a) => api.current?.executeCommand(...a);
   const ctl = (obj) => cmd("sendChatMessage", CTL + JSON.stringify(obj));
@@ -94,6 +104,28 @@ export default function ClassRoom({ roomName, displayName, email, subject, isIns
     cmd("setLargeVideoParticipant", id, type);
     setFocusKey(`${id}:${type}`);
   };
+
+  // ---- zoom + drag to pan ----
+  const clampPan = (p, z) => {
+    const r = stageRef.current?.getBoundingClientRect();
+    if (!r) return p;
+    const mx = (r.width * (z - 1)) / 2;
+    const my = (r.height * (z - 1)) / 2;
+    return { x: Math.max(-mx, Math.min(mx, p.x)), y: Math.max(-my, Math.min(my, p.y)) };
+  };
+  const setZ = (z) => { setZoom(z); setPan((p) => (z === 1 ? { x: 0, y: 0 } : clampPan(p, z))); };
+  const cycleZoom = () => setZ(ZOOMS[(ZOOMS.indexOf(zoom) + 1) % ZOOMS.length]);
+  const onDown = (e) => { dragRef.current = { x: e.clientX, y: e.clientY, p: pan }; e.currentTarget.setPointerCapture?.(e.pointerId); };
+  const onMove = (e) => {
+    const d = dragRef.current;
+    if (!d) return;
+    setPan(clampPan({ x: d.p.x + e.clientX - d.x, y: d.p.y + e.clientY - d.y }, zoom));
+  };
+  const onUp = () => { dragRef.current = null; };
+
+  useEffect(() => {
+    if (!hostSharing) { setZoom(1); setPan({ x: 0, y: 0 }); setShowUi(false); }
+  }, [hostSharing]);
 
   useEffect(() => {
     const on = () => setFs(!!document.fullscreenElement);
@@ -130,6 +162,7 @@ export default function ClassRoom({ roomName, displayName, email, subject, isIns
             disableInviteFunctions: true,
             hideConferenceSubject: true,
             subject,
+            desktopSharingFrameRate: { min: 5, max: 15 }, // kam fps, zyada saaf text
             // Student ke liye: grid view band, aur phone pe thumbnails band, taaki teacher bada dikhe
             disableTileView: !isInstructor,
             tileView: { disabled: !isInstructor },
@@ -141,6 +174,7 @@ export default function ClassRoom({ roomName, displayName, email, subject, isIns
             SHOW_BRAND_WATERMARK: false,
             SHOW_WATERMARK_FOR_GUESTS: false,
             DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
+            DISABLE_VIDEO_BACKGROUND: true, // dhundhli blur background band
             DEFAULT_BACKGROUND: "#0b1220",
           },
         });
@@ -183,6 +217,9 @@ export default function ClassRoom({ roomName, displayName, email, subject, isIns
               ids.current.hostSharing = !!d.on;
               setHostSharing(!!d.on);
               setTimeout(() => focus(e.from, d.on ? "desktop" : "camera"), d.on ? 800 : 0);
+              if (d.on && !window.matchMedia(DESKTOP_Q).matches) {
+                toast("Teacher is sharing the screen. Tap “Full screen” and rotate your phone for the best view.", { duration: 6000 });
+              }
             } else if (d.t === "req" && isInstructor) {
               setRequests((r) => (r.includes(e.from) ? r : [...r, e.from]));
               toast(`${e.nick || "A student"} wants to share their screen`);
@@ -318,45 +355,56 @@ export default function ClassRoom({ roomName, displayName, email, subject, isIns
     </div>
   );
 
+  const floatBtn = "rounded-full bg-black/60 px-3 py-2 text-xs font-medium text-white ring-1 ring-white/30 backdrop-blur";
+
   return (
-    <div className="flex flex-col bg-[#0b1220] text-white" style={{ height: "100dvh" }}>
+    <div className="relative flex flex-col overflow-hidden bg-[#0b1220] text-white" style={{ height: "100dvh" }}>
       {/* Top bar */}
-      <div className={`flex shrink-0 items-center justify-between px-3 sm:px-4 ${compact ? "h-9" : "h-14"}`}>
-        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-          <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-red-600 px-2.5 py-1 text-xs font-bold">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />LIVE
-          </span>
-          <p className="truncate text-xs font-medium text-slate-200 sm:text-sm">{subject}</p>
+      {!immersive && (
+        <div className={`flex shrink-0 items-center justify-between px-3 sm:px-4 ${compact ? "h-9" : "h-14"}`}>
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-red-600 px-2.5 py-1 text-xs font-bold">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />LIVE
+            </span>
+            <p className="truncate text-xs font-medium text-slate-200 sm:text-sm">{subject}</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {isInstructor && requests.length > 0 && (
+              <span className="rounded-full bg-amber-500 px-2.5 py-1 text-xs font-semibold text-black">{requests.length} share request</span>
+            )}
+            {isInstructor && (
+              <button onClick={() => cmd("muteEveryone")} className="flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5 text-xs hover:bg-white/20 sm:px-3 sm:text-sm">
+                <VolumeX size={15} /><span className="hidden sm:inline">Mute all</span>
+              </button>
+            )}
+            {isInstructor && onEnd && (
+              <button onClick={onEnd} className="rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-semibold hover:bg-red-700 sm:px-3 sm:text-sm">End class</button>
+            )}
+          </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {isInstructor && requests.length > 0 && (
-            <span className="rounded-full bg-amber-500 px-2.5 py-1 text-xs font-semibold text-black">{requests.length} share request</span>
-          )}
-          {isInstructor && (
-            <button onClick={() => cmd("muteEveryone")} className="flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5 text-xs hover:bg-white/20 sm:px-3 sm:text-sm">
-              <VolumeX size={15} /><span className="hidden sm:inline">Mute all</span>
-            </button>
-          )}
-          {isInstructor && onEnd && (
-            <button onClick={onEnd} className="rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-semibold hover:bg-red-700 sm:px-3 sm:text-sm">End class</button>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* Stage + panel */}
       <div className="relative flex min-h-0 flex-1">
         {desktop && chatOpen && <aside className="w-72 shrink-0">{panel}</aside>}
 
-        <main className="relative min-w-0 flex-1">
-          <div ref={box} className="absolute inset-0" />
+        <main ref={stageRef} className="relative min-w-0 flex-1 overflow-hidden">
+          <div
+            ref={box}
+            className="absolute inset-0"
+            style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: "center" }}
+          />
+          {zoom > 1 && (
+            <div className="absolute inset-0 z-10 touch-none" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} />
+          )}
           {status !== "live" && (
-            <div className="absolute inset-0 flex items-center justify-center bg-[#0b1220] px-6 text-center text-slate-300">
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0b1220] px-6 text-center text-slate-300">
               {status === "error" ? "Could not load the class room. Refresh the page." : "Joining class…"}
             </div>
           )}
         </main>
 
-        {!desktop && chatOpen && (
+        {!desktop && chatOpen && !immersive && (
           <div className={`absolute z-30 overflow-hidden shadow-2xl ${compact ? "inset-y-0 right-0 w-80 max-w-[70%]" : "inset-x-0 bottom-0 h-[62%] rounded-t-2xl"}`}>
             {panel}
           </div>
@@ -364,7 +412,7 @@ export default function ClassRoom({ roomName, displayName, email, subject, isIns
       </div>
 
       {/* Phone (portrait): kisko bada dekhna hai, tap karo */}
-      {!desktop && !compact && (
+      {!desktop && !compact && !immersive && (
         <div className="flex shrink-0 gap-2 overflow-x-auto px-3 py-2">
           {hostSharing && !isInstructor && hostId && (
             <button onClick={() => focus(hostId, "desktop")}
@@ -383,17 +431,36 @@ export default function ClassRoom({ roomName, displayName, email, subject, isIns
       )}
 
       {/* Bottom bar */}
-      <div className={`flex shrink-0 items-center justify-center gap-2 px-2 sm:gap-4 ${compact ? "h-14" : "h-16 sm:h-20"}`}>
-        <Btn sm={compact} title="Raise hand" on={hand} onClick={() => { cmd("toggleRaiseHand"); setHand((h) => !h); }}><Hand size={20} /></Btn>
-        <Btn sm={compact} title={muted ? "Unmute" : "Mute"} danger={muted} onClick={() => cmd("toggleAudio")}>{muted ? <MicOff size={20} /> : <Mic size={20} />}</Btn>
-        <Btn sm={compact} title={camOff ? "Start camera" : "Stop camera"} danger={camOff} onClick={() => cmd("toggleVideo")}>{camOff ? <VideoOff size={20} /> : <Video size={20} />}</Btn>
-        {CAN_CAPTURE && (
-          <Btn sm={compact} title={isInstructor || canShare ? "Share screen" : "Ask the teacher to let you share your screen"} on={sharing} dim={!isInstructor && !canShare} onClick={share}><MonitorUp size={20} /></Btn>
-        )}
-        <Btn sm={compact} title={chatOpen ? "Hide chat" : "Show chat"} on={chatOpen} badge={unread + (isInstructor ? requests.length : 0)} onClick={toggleChat}><MessageSquare size={20} /></Btn>
-        <Btn sm={compact} title={fs ? "Exit fullscreen" : "Fullscreen"} onClick={fullscreen}>{fs ? <Minimize size={20} /> : <Maximize size={20} />}</Btn>
-        <Btn sm={compact} title="Leave class" danger onClick={leave}><PhoneOff size={20} /></Btn>
-      </div>
+      {!immersive && (
+        <div className={`flex shrink-0 items-center justify-center gap-2 px-2 sm:gap-4 ${compact ? "h-14" : "h-16 sm:h-20"}`}>
+          <Btn sm={compact} title="Raise hand" on={hand} onClick={() => { cmd("toggleRaiseHand"); setHand((h) => !h); }}><Hand size={20} /></Btn>
+          <Btn sm={compact} title={muted ? "Unmute" : "Mute"} danger={muted} onClick={() => cmd("toggleAudio")}>{muted ? <MicOff size={20} /> : <Mic size={20} />}</Btn>
+          <Btn sm={compact} title={camOff ? "Start camera" : "Stop camera"} danger={camOff} onClick={() => cmd("toggleVideo")}>{camOff ? <VideoOff size={20} /> : <Video size={20} />}</Btn>
+          {CAN_CAPTURE && (
+            <Btn sm={compact} title={isInstructor || canShare ? "Share screen" : "Ask the teacher to let you share your screen"} on={sharing} dim={!isInstructor && !canShare} onClick={share}><MonitorUp size={20} /></Btn>
+          )}
+          <Btn sm={compact} title={chatOpen ? "Hide chat" : "Show chat"} on={chatOpen} badge={unread + (isInstructor ? requests.length : 0)} onClick={toggleChat}><MessageSquare size={20} /></Btn>
+          {!isInstructor && hostSharing && (
+            <>
+              <Btn sm={compact} title="Zoom the shared screen" on={zoom > 1} onClick={cycleZoom}>
+                {zoom > 1 ? <span className="text-xs font-bold">{zoom}×</span> : <ZoomIn size={20} />}
+              </Btn>
+              {!desktop && <Btn sm={compact} title="Big screen view" onClick={() => setShowUi(false)}><Expand size={20} /></Btn>}
+            </>
+          )}
+          <Btn sm={compact} title={fs ? "Exit fullscreen" : "Fullscreen"} onClick={fullscreen}>{fs ? <Minimize size={20} /> : <Maximize size={20} />}</Btn>
+          <Btn sm={compact} title="Leave class" danger onClick={leave}><PhoneOff size={20} /></Btn>
+        </div>
+      )}
+
+      {/* Immersive mode: sirf chhote floating buttons */}
+      {immersive && (
+        <div className="absolute bottom-3 right-3 z-30 flex items-center gap-2">
+          <button onClick={fullscreen} className={floatBtn}>{fs ? "Exit full screen" : "Full screen"}</button>
+          <button onClick={cycleZoom} className={floatBtn}>Zoom {zoom}×</button>
+          <button onClick={() => setShowUi(true)} className={floatBtn}>Controls</button>
+        </div>
+      )}
     </div>
   );
 }
