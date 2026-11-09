@@ -6,11 +6,10 @@ const DOMAIN = import.meta.env.VITE_JITSI_DOMAIN || "meet.jit.si";
 const CTL = "[[SL]]"; // chhupe control sandesh (share permission, teacher ki screen). Chat mein nahi dikhte.
 
 const DESKTOP_Q = "(min-width: 768px) and (min-height: 521px)";
-const COMPACT_Q = "(orientation: landscape) and (max-height: 520px)"; 
+const COMPACT_Q = "(orientation: landscape) and (max-height: 520px)"; // phone landscape
+
+// Phone ke browsers screen capture support nahi karte (sirf laptop/desktop pe hota hai)
 const CAN_CAPTURE = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia;
-{CAN_CAPTURE && (
-  <Btn sm={compact} title={isInstructor || canShare ? "Share screen" : "Ask the teacher to let you share your screen"} on={sharing} dim={!isInstructor && !canShare} onClick={share}><MonitorUp size={20} /></Btn>
-)}
 
 const loadApi = (domain, appId) =>
   new Promise((resolve, reject) => {
@@ -53,7 +52,8 @@ const Btn = ({ on, danger, dim, sm, badge, title, onClick, children }) => (
   </button>
 );
 
-export default function ClassRoom({ roomName, displayName, email, subject, isInstructor, onLeave, onEnd, jaas }) {  const box = useRef(null);
+export default function ClassRoom({ roomName, displayName, email, subject, isInstructor, onLeave, onEnd, jaas }) {
+  const box = useRef(null);
   const api = useRef(null);
   const chatEnd = useRef(null);
   const ids = useRef({ me: null, host: null, hostSharing: false });
@@ -107,15 +107,16 @@ export default function ClassRoom({ roomName, displayName, email, subject, isIns
     const small = window.innerWidth < 900 || window.innerHeight < 520; // phone
     const refresh = () =>
       j && setPeople((j.getParticipantsInfo() || []).map((p) => ({ id: p.participantId, name: p.displayName || "Guest" })));
-    const announce = () => { if (isInstructor) setTimeout(() => ctl({ t: "host", sharing: sharingRef.current }), 1500); };
+    const hostInfo = () => ctl({ t: "host", sharing: sharingRef.current });
+    const announce = () => { if (isInstructor) setTimeout(hostInfo, 1500); };
 
-    loadApi()
+    loadApi(jaas ? "8x8.vc" : DOMAIN, jaas?.appId)
       .then(() => {
         if (dead || !box.current) return;
         j = new window.JitsiMeetExternalAPI(jaas ? "8x8.vc" : DOMAIN, {
           roomName: jaas ? `${jaas.appId}/${jaas.room}` : roomName,
-           jwt: jaas?.token,
-            parentNode: box.current,
+          jwt: jaas?.token,
+          parentNode: box.current,
           width: "100%",
           height: "100%",
           userInfo: { displayName, email },
@@ -152,6 +153,11 @@ export default function ClassRoom({ roomName, displayName, email, subject, isIns
           setStatus("live");
           refresh();
           announce();
+          if (!isInstructor) {
+            // student teacher se khud pooch leta hai: "host kaun hai?" (timing chhoot jaye toh bhi pata chal jaye)
+            setTimeout(() => ctl({ t: "hello" }), 1500);
+            setTimeout(() => { if (!ids.current.host) ctl({ t: "hello" }); }, 5000);
+          }
         });
         j.addListener("participantJoined", () => { refresh(); announce(); });
         j.addListener("participantLeft", refresh);
@@ -163,7 +169,9 @@ export default function ClassRoom({ roomName, displayName, email, subject, isIns
             let d;
             try { d = JSON.parse(raw.slice(CTL.length)); } catch { return; }
 
-            if (d.t === "host" && !isInstructor) {
+            if (d.t === "hello" && isInstructor) {
+              hostInfo();
+            } else if (d.t === "host" && !isInstructor) {
               const sh = !!d.sharing;
               const changed = ids.current.host !== e.from || ids.current.hostSharing !== sh;
               ids.current.host = e.from;
@@ -178,7 +186,7 @@ export default function ClassRoom({ roomName, displayName, email, subject, isIns
             } else if (d.t === "req" && isInstructor) {
               setRequests((r) => (r.includes(e.from) ? r : [...r, e.from]));
               toast(`${e.nick || "A student"} wants to share their screen`);
-            } else if (!isInstructor && e.from === ids.current.host && d.to === ids.current.me) {
+            } else if (!isInstructor && (!ids.current.host || e.from === ids.current.host) && d.to === ids.current.me) {
               if (d.t === "allow") { setCanShare(true); setPending(false); toast.success("The teacher allowed you to share your screen"); }
               if (d.t === "deny") { setPending(false); toast("The teacher declined your request"); }
               if (d.t === "revoke") {
@@ -209,7 +217,7 @@ export default function ClassRoom({ roomName, displayName, email, subject, isIns
       api.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomName]);
+  }, [roomName, jaas?.token]);
 
   useEffect(() => {
     // 12 second mein join na ho toh parda hatao, taaki Jitsi ka apna message dikhe
@@ -237,6 +245,7 @@ export default function ClassRoom({ roomName, displayName, email, subject, isIns
 
   // Share button: teacher seedha; student tabhi jab permission mili ho, warna request jaati hai
   const share = () => {
+    if (!CAN_CAPTURE) return toast.error("Screen sharing is not supported on phones. Use a laptop or desktop browser.");
     if (isInstructor || canShare) return cmd("toggleShareScreen");
     if (pending) return toast("Request already sent to the teacher");
     ctl({ t: "req" });
@@ -378,7 +387,9 @@ export default function ClassRoom({ roomName, displayName, email, subject, isIns
         <Btn sm={compact} title="Raise hand" on={hand} onClick={() => { cmd("toggleRaiseHand"); setHand((h) => !h); }}><Hand size={20} /></Btn>
         <Btn sm={compact} title={muted ? "Unmute" : "Mute"} danger={muted} onClick={() => cmd("toggleAudio")}>{muted ? <MicOff size={20} /> : <Mic size={20} />}</Btn>
         <Btn sm={compact} title={camOff ? "Start camera" : "Stop camera"} danger={camOff} onClick={() => cmd("toggleVideo")}>{camOff ? <VideoOff size={20} /> : <Video size={20} />}</Btn>
-        <Btn sm={compact} title={isInstructor || canShare ? "Share screen" : "Ask the teacher to let you share your screen"} on={sharing} dim={!isInstructor && !canShare} onClick={share}><MonitorUp size={20} /></Btn>
+        {CAN_CAPTURE && (
+          <Btn sm={compact} title={isInstructor || canShare ? "Share screen" : "Ask the teacher to let you share your screen"} on={sharing} dim={!isInstructor && !canShare} onClick={share}><MonitorUp size={20} /></Btn>
+        )}
         <Btn sm={compact} title={chatOpen ? "Hide chat" : "Show chat"} on={chatOpen} badge={unread + (isInstructor ? requests.length : 0)} onClick={toggleChat}><MessageSquare size={20} /></Btn>
         <Btn sm={compact} title={fs ? "Exit fullscreen" : "Fullscreen"} onClick={fullscreen}>{fs ? <Minimize size={20} /> : <Maximize size={20} />}</Btn>
         <Btn sm={compact} title="Leave class" danger onClick={leave}><PhoneOff size={20} /></Btn>
