@@ -6,8 +6,8 @@ const DOMAIN = import.meta.env.VITE_JITSI_DOMAIN || "meet.jit.si";
 const CTL = "[[SL]]"; // chhupe control sandesh (share permission, teacher ki screen). Chat mein nahi dikhte.
 
 const DESKTOP_Q = "(min-width: 768px) and (min-height: 521px)";
-const COMPACT_Q = "(orientation: landscape) and (max-height: 520px)"; // phone landscape
-// Phone ke browsers screen capture support nahi karte (sirf laptop/desktop pe hota hai)
+const COMPACT_Q = "(orientation: landscape) and (max-height: 520px)"; 
+const CAN_CAPTURE = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia;
 {CAN_CAPTURE && (
   <Btn sm={compact} title={isInstructor || canShare ? "Share screen" : "Ask the teacher to let you share your screen"} on={sharing} dim={!isInstructor && !canShare} onClick={share}><MonitorUp size={20} /></Btn>
 )}

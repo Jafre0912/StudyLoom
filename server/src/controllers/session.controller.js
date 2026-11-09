@@ -204,4 +204,4 @@ const shareAccess = asyncHandler(async (req, res) => {
   sendResponse(res, 200, "Updated");
 });
 
-module.exports = { mySessions, publicSessions, getSession, startSession, endSession, join, heartbeat, leave, roster, myAttendance, roomToken, shareAccess };
+module.exports = { mySessions, publicSessions, getSession, startSession, endSession, join, heartbeat, leave, roster, myAttendance, roomToken, shareAccess, jaasToken };
