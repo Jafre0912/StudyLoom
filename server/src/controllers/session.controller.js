@@ -164,9 +164,6 @@ const myAttendance = asyncHandler(async (req, res) => {
   sendResponse(res, 200, "Attendance fetched", { items });
 });
 
-
-const jwt = require("jsonwebtoken");
-
 // POST /api/sessions/:id/jaas-token  -> JaaS room ka login token
 const jaasToken = asyncHandler(async (req, res) => {
   const { s, isHost } = await authorise(req, req.params.id);
