@@ -31,10 +31,15 @@ export default function LiveRoomPage() {
   const isStudent = user?.role === "student";
 
   // JaaS: class live hote hi room ka login token lo
-  useEffect(() => {
-    if (!USE_JAAS || !s || s.status !== "live") return;
-    api.fetchJaasToken(sessionId).then(setJaas).catch((e) => setJoinErr(e.message));
-  }, [s?.status, sessionId]);
+useEffect(() => {
+  if (!USE_JAAS || !s || s.status !== "live") return;
+  api.fetchJaasToken(sessionId)
+    .then((d) => {
+      if (!d?.token) throw new Error("Login token missing. Check fetchJaasToken in api.js");
+      setJaas(d);
+    })
+    .catch((e) => setJoinErr(e.message));
+}, [s?.status, sessionId]);
 
   // Student attendance: join + 30s heartbeat
   useEffect(() => {
